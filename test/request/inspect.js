@@ -29,7 +29,6 @@ describe('req.inspect()', () => {
         host: 'example.com'
       }
     };
-
     assert.deepEqual(req.inspect(), expected);
     assert.deepEqual(util.inspect(req), util.inspect(expected));
   });

@@ -1,30 +1,39 @@
+import Debug from 'debug'
+import { URL, format as stringify } from 'url'
+import * as net from 'net'
+import accepts from 'accepts'
+import * as contentType from 'content-type'
+import parse from 'parseurl'
+import * as qs from 'querystring'
+import typeis from 'type-is'
+import fresh from 'fresh'
+import http from 'http'
+import util from 'util'
 
-'use strict';
+import Application from './application'
+import { Context } from './context'
+import { logMethod } from './util/debug'
 
-/**
- * Module dependencies.
- */
+const debug = Debug('koa:request')
+const IP = Symbol('context#ip')
 
-const URL = require('url').URL;
-const net = require('net');
-const accepts = require('accepts');
-const contentType = require('content-type');
-const stringify = require('url').format;
-const parse = require('parseurl');
-const qs = require('querystring');
-const typeis = require('type-is');
-const fresh = require('fresh');
-const only = require('only');
-const util = require('util');
+// @logMethod(debug)
+class Request {
+  originalUrl: string
+  _querycache: any
+  memoizedURL?: URL
+  _accept: any;
+  [IP]: string
+  response: any
+  ctx?: Context
 
-const IP = Symbol('context#ip');
-
-/**
- * Prototype.
- */
-
-module.exports = {
-
+  constructor(
+    public app: Application,
+    public req: http.IncomingMessage,
+    public res: http.ServerResponse,
+  ) {
+    this.originalUrl = req.url!
+  }
   /**
    * Return request header.
    *
@@ -33,8 +42,8 @@ module.exports = {
    */
 
   get header() {
-    return this.req.headers;
-  },
+    return this.req.headers
+  }
 
   /**
    * Set request header.
@@ -43,8 +52,8 @@ module.exports = {
    */
 
   set header(val) {
-    this.req.headers = val;
-  },
+    this.req.headers = val
+  }
 
   /**
    * Return request header, alias as request.header
@@ -54,8 +63,8 @@ module.exports = {
    */
 
   get headers() {
-    return this.req.headers;
-  },
+    return this.req.headers
+  }
 
   /**
    * Set request header, alias as request.header
@@ -64,8 +73,8 @@ module.exports = {
    */
 
   set headers(val) {
-    this.req.headers = val;
-  },
+    this.req.headers = val
+  }
 
   /**
    * Get request URL.
@@ -75,8 +84,8 @@ module.exports = {
    */
 
   get url() {
-    return this.req.url;
-  },
+    return this.req.url
+  }
 
   /**
    * Set request URL.
@@ -85,8 +94,8 @@ module.exports = {
    */
 
   set url(val) {
-    this.req.url = val;
-  },
+    this.req.url = val
+  }
 
   /**
    * Get origin of URL.
@@ -96,8 +105,8 @@ module.exports = {
    */
 
   get origin() {
-    return `${this.protocol}://${this.host}`;
-  },
+    return `${this.protocol}://${this.host}`
+  }
 
   /**
    * Get full request URL.
@@ -108,9 +117,9 @@ module.exports = {
 
   get href() {
     // support: `GET http://example.com/foo`
-    if (/^https?:\/\//i.test(this.originalUrl)) return this.originalUrl;
-    return this.origin + this.originalUrl;
-  },
+    if (/^https?:\/\//i.test(this.originalUrl)) return this.originalUrl
+    return this.origin + this.originalUrl
+  }
 
   /**
    * Get request method.
@@ -120,8 +129,8 @@ module.exports = {
    */
 
   get method() {
-    return this.req.method;
-  },
+    return this.req.method!
+  }
 
   /**
    * Set request method.
@@ -130,9 +139,9 @@ module.exports = {
    * @api public
    */
 
-  set method(val) {
-    this.req.method = val;
-  },
+  set method(val: string) {
+    this.req.method = val
+  }
 
   /**
    * Get request pathname.
@@ -142,8 +151,8 @@ module.exports = {
    */
 
   get path() {
-    return parse(this.req).pathname;
-  },
+    return parse(this.req)!.pathname
+  }
 
   /**
    * Set pathname, retaining the query-string when present.
@@ -153,14 +162,14 @@ module.exports = {
    */
 
   set path(path) {
-    const url = parse(this.req);
-    if (url.pathname === path) return;
+    const url = parse(this.req)!
+    if (url.pathname === path) return
 
-    url.pathname = path;
-    url.path = null;
+    url.pathname = path
+    url.path = undefined
 
-    this.url = stringify(url);
-  },
+    this.url = stringify(url)
+  }
 
   /**
    * Get parsed query-string.
@@ -169,11 +178,11 @@ module.exports = {
    * @api public
    */
 
-  get query() {
-    const str = this.querystring;
-    const c = this._querycache = this._querycache || {};
-    return c[str] || (c[str] = qs.parse(str));
-  },
+  get query(): qs.ParsedUrlQuery {
+    const str = this.querystring
+    const c = (this._querycache = this._querycache || {})
+    return c[str] || (c[str] = qs.parse(str))
+  }
 
   /**
    * Set query-string as an object.
@@ -183,8 +192,8 @@ module.exports = {
    */
 
   set query(obj) {
-    this.querystring = qs.stringify(obj);
-  },
+    this.querystring = qs.stringify(obj)
+  }
 
   /**
    * Get query string.
@@ -194,9 +203,9 @@ module.exports = {
    */
 
   get querystring() {
-    if (!this.req) return '';
-    return parse(this.req).query || '';
-  },
+    if (!this.req) return ''
+    return (parse(this.req)!.query as string) || ''
+  }
 
   /**
    * Set querystring.
@@ -206,14 +215,14 @@ module.exports = {
    */
 
   set querystring(str) {
-    const url = parse(this.req);
-    if (url.search === `?${str}`) return;
+    const url = parse(this.req)!
+    if (url.search === `?${str}`) return
 
-    url.search = str;
-    url.path = null;
+    url.search = str
+    url.path = undefined
 
-    this.url = stringify(url);
-  },
+    this.url = stringify(url)
+  }
 
   /**
    * Get the search string. Same as the querystring
@@ -224,9 +233,9 @@ module.exports = {
    */
 
   get search() {
-    if (!this.querystring) return '';
-    return `?${this.querystring}`;
-  },
+    if (!this.querystring) return ''
+    return `?${this.querystring}`
+  }
 
   /**
    * Set the search string. Same as
@@ -237,8 +246,8 @@ module.exports = {
    */
 
   set search(str) {
-    this.querystring = str;
-  },
+    this.querystring = str
+  }
 
   /**
    * Parse the "Host" header field host
@@ -250,15 +259,15 @@ module.exports = {
    */
 
   get host() {
-    const proxy = this.app.proxy;
-    let host = proxy && this.get('X-Forwarded-Host');
+    const proxy = this.app.proxy
+    let host = proxy && this.get('X-Forwarded-Host')
     if (!host) {
-      if (this.req.httpVersionMajor >= 2) host = this.get(':authority');
-      if (!host) host = this.get('Host');
+      if (this.req.httpVersionMajor >= 2) host = this.get(':authority')
+      if (!host) host = this.get('Host')
     }
-    if (!host) return '';
-    return host.split(/\s*,\s*/, 1)[0];
-  },
+    if (!host) return ''
+    return host.split(/\s*,\s*/, 1)[0]
+  }
 
   /**
    * Parse the "Host" header field hostname
@@ -270,11 +279,11 @@ module.exports = {
    */
 
   get hostname() {
-    const host = this.host;
-    if (!host) return '';
-    if ('[' == host[0]) return this.URL.hostname || ''; // IPv6
-    return host.split(':', 1)[0];
-  },
+    const host = this.host
+    if (!host) return ''
+    if ('[' == host[0]) return this.URL!.hostname || '' // IPv6
+    return host.split(':', 1)[0]
+  }
 
   /**
    * Get WHATWG parsed URL.
@@ -287,15 +296,15 @@ module.exports = {
   get URL() {
     /* istanbul ignore else */
     if (!this.memoizedURL) {
-      const originalUrl = this.originalUrl || ''; // avoid undefined in template string
+      const originalUrl = this.originalUrl || '' // avoid undefined in template string
       try {
-        this.memoizedURL = new URL(`${this.origin}${originalUrl}`);
+        this.memoizedURL = new URL(`${this.origin}${originalUrl}`)
       } catch (err) {
-        this.memoizedURL = Object.create(null);
+        this.memoizedURL = Object.create(null)
       }
     }
-    return this.memoizedURL;
-  },
+    return this.memoizedURL
+  }
 
   /**
    * Check if the request is fresh, aka
@@ -307,19 +316,19 @@ module.exports = {
    */
 
   get fresh() {
-    const method = this.method;
-    const s = this.ctx.status;
+    const method = this.method
+    const s = this.ctx!.status
 
     // GET or HEAD for weak freshness validation only
-    if ('GET' != method && 'HEAD' != method) return false;
+    if ('GET' != method && 'HEAD' != method) return false
 
     // 2xx or 304 as per rfc2616 14.26
     if ((s >= 200 && s < 300) || 304 == s) {
-      return fresh(this.header, this.response.header);
+      return fresh(this.header, this.response!.header)
     }
 
-    return false;
-  },
+    return false
+  }
 
   /**
    * Check if the request is stale, aka
@@ -331,8 +340,8 @@ module.exports = {
    */
 
   get stale() {
-    return !this.fresh;
-  },
+    return !this.fresh
+  }
 
   /**
    * Check if the request is idempotent.
@@ -342,9 +351,9 @@ module.exports = {
    */
 
   get idempotent() {
-    const methods = ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS', 'TRACE'];
-    return !!~methods.indexOf(this.method);
-  },
+    const methods = ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS', 'TRACE']
+    return !!~methods.indexOf(this.method!)
+  }
 
   /**
    * Return the request socket.
@@ -354,8 +363,8 @@ module.exports = {
    */
 
   get socket() {
-    return this.req.socket;
-  },
+    return this.req.socket
+  }
 
   /**
    * Get the charset when present or undefined.
@@ -366,12 +375,12 @@ module.exports = {
 
   get charset() {
     try {
-      const { parameters } = contentType.parse(this.req);
-      return parameters.charset || '';
+      const { parameters } = contentType.parse(this.req)
+      return parameters.charset || ''
     } catch (e) {
-      return '';
+      return ''
     }
-  },
+  }
 
   /**
    * Return parsed Content-Length when present.
@@ -381,10 +390,10 @@ module.exports = {
    */
 
   get length() {
-    const len = this.get('Content-Length');
-    if (len == '') return;
-    return ~~len;
-  },
+    const len = this.get('Content-Length')
+    if (len == '') return
+    return ~~len
+  }
 
   /**
    * Return the protocol string "http" or "https"
@@ -399,11 +408,11 @@ module.exports = {
    */
 
   get protocol() {
-    if (this.socket.encrypted) return 'https';
-    if (!this.app.proxy) return 'http';
-    const proto = this.get('X-Forwarded-Proto');
-    return proto ? proto.split(/\s*,\s*/, 1)[0] : 'http';
-  },
+    if ((this.socket as any).encrypted) return 'https'
+    if (!this.app.proxy) return 'http'
+    const proto = this.get('X-Forwarded-Proto')
+    return proto ? proto.split(/\s*,\s*/, 1)[0] : 'http'
+  }
 
   /**
    * Short-hand for:
@@ -415,8 +424,8 @@ module.exports = {
    */
 
   get secure() {
-    return 'https' == this.protocol;
-  },
+    return 'https' == this.protocol
+  }
 
   /**
    * When `app.proxy` is `true`, parse
@@ -431,12 +440,10 @@ module.exports = {
    */
 
   get ips() {
-    const proxy = this.app.proxy;
-    const val = this.get('X-Forwarded-For');
-    return proxy && val
-      ? val.split(/\s*,\s*/)
-      : [];
-  },
+    const proxy = this.app.proxy
+    const val = this.get('X-Forwarded-For')
+    return proxy && val ? val.split(/\s*,\s*/) : []
+  }
 
   /**
    * Return request's remote address
@@ -447,16 +454,16 @@ module.exports = {
    * @api public
    */
 
-  get ip() {
+  get ip(): string {
     if (!this[IP]) {
-      this[IP] = this.ips[0] || this.socket.remoteAddress || '';
+      this[IP] = this.ips[0] || this.socket.remoteAddress || ''
     }
-    return this[IP];
-  },
+    return this[IP]
+  }
 
   set ip(_ip) {
-    this[IP] = _ip;
-  },
+    this[IP] = _ip
+  }
 
   /**
    * Return subdomains as an array.
@@ -475,14 +482,14 @@ module.exports = {
    */
 
   get subdomains() {
-    const offset = this.app.subdomainOffset;
-    const hostname = this.hostname;
-    if (net.isIP(hostname)) return [];
+    const offset = this.app.subdomainOffset
+    const hostname = this.hostname
+    if (net.isIP(hostname)) return []
     return hostname
       .split('.')
       .reverse()
-      .slice(offset);
-  },
+      .slice(offset)
+  }
 
   /**
    * Get accept object.
@@ -491,9 +498,9 @@ module.exports = {
    * @return {Object}
    * @api private
    */
-  get accept() {
-    return this._accept || (this._accept = accepts(this.req));
-  },
+  get accept(): accepts.Accepts {
+    return this._accept || (this._accept = accepts(this.req))
+  }
 
   /**
    * Set accept object.
@@ -502,8 +509,8 @@ module.exports = {
    * @api private
    */
   set accept(obj) {
-    this._accept = obj;
-  },
+    this._accept = obj
+  }
 
   /**
    * Check if the given `type(s)` is acceptable, returning
@@ -546,9 +553,9 @@ module.exports = {
    * @api public
    */
 
-  accepts(...args) {
-    return this.accept.types(...args);
-  },
+  accepts(...args: string[]): string | string[] | false {
+    return this.accept.types(...args)
+  }
 
   /**
    * Return accepted encodings or best fit based on `encodings`.
@@ -563,9 +570,9 @@ module.exports = {
    * @api public
    */
 
-  acceptsEncodings(...args) {
-    return this.accept.encodings(...args);
-  },
+  acceptsEncodings(...args: string[]): string | false {
+    return this.accept.encodings(...args)
+  }
 
   /**
    * Return accepted charsets or best fit based on `charsets`.
@@ -580,9 +587,9 @@ module.exports = {
    * @api public
    */
 
-  acceptsCharsets(...args) {
-    return this.accept.charsets(...args);
-  },
+  acceptsCharsets(...args: string[]) {
+    return this.accept.charsets(...args)
+  }
 
   /**
    * Return accepted languages or best fit based on `langs`.
@@ -597,9 +604,9 @@ module.exports = {
    * @api public
    */
 
-  acceptsLanguages(...args) {
-    return this.accept.languages(...args);
-  },
+  acceptsLanguages(...args: string[]) {
+    return this.accept.languages(...args)
+  }
 
   /**
    * Check if the incoming request contains the "Content-Type"
@@ -627,11 +634,11 @@ module.exports = {
    * @api public
    */
 
-  is(types) {
-    if (!types) return typeis(this.req);
-    if (!Array.isArray(types)) types = [].slice.call(arguments);
-    return typeis(this.req, types);
-  },
+  is(types: string[]) {
+    if (!types) return typeis(this.req)
+    if (!Array.isArray(types)) types = [].slice.call(arguments)
+    return typeis(this.req, types)
+  }
 
   /**
    * Return the request mime type void of
@@ -642,10 +649,10 @@ module.exports = {
    */
 
   get type() {
-    const type = this.get('Content-Type');
-    if (!type) return '';
-    return type.split(';')[0];
-  },
+    const type = this.get('Content-Type')
+    if (!type) return ''
+    return type.split(';')[0]
+  }
 
   /**
    * Return request header.
@@ -669,16 +676,28 @@ module.exports = {
    * @api public
    */
 
-  get(field) {
-    const req = this.req;
-    switch (field = field.toLowerCase()) {
+  get(field: string): string {
+    const req = this.req
+    switch ((field = field.toLowerCase())) {
       case 'referer':
       case 'referrer':
-        return req.headers.referrer || req.headers.referer || '';
+        return (
+          (req.headers.referrer &&
+            (typeof req.headers.referrer === 'string'
+              ? req.headers.referrer
+              : req.headers.referrer[0])) ||
+          req.headers.referer ||
+          ''
+        )
       default:
-        return req.headers[field] || '';
+        const val = req.headers[field]
+        if (typeof val === 'object') {
+          return val[0]
+        } else {
+          return val || ''
+        }
     }
-  },
+  }
 
   /**
    * Inspect implementation.
@@ -688,10 +707,10 @@ module.exports = {
    */
 
   inspect() {
-    if (!this.req) return;
-    return this.toJSON();
-  },
-
+    if (!this.req) return
+    return this.toJSON()
+  }
+  [util.inspect.custom] = this.inspect
   /**
    * Return JSON representation.
    *
@@ -700,22 +719,12 @@ module.exports = {
    */
 
   toJSON() {
-    return only(this, [
-      'method',
-      'url',
-      'header'
-    ]);
+    return {
+      method: this.method,
+      url: this.url,
+      header: this.header,
+    }
   }
-};
-
-/**
- * Custom inspection implementation for newer Node.js versions.
- *
- * @return {Object}
- * @api public
- */
-
-/* istanbul ignore else */
-if (util.inspect.custom) {
-  module.exports[util.inspect.custom] = module.exports.inspect;
 }
+
+export default Request
