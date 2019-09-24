@@ -24,6 +24,7 @@ const http_methods = strEnum(['get', 'post', 'put', 'patch', 'delete'])
 declare module 'routington' {
   export default interface Routington extends Handlers {
     [ROUTER]: Router
+    middleware?: Middleware<any>[]
   }
   type Handlers = {
     [key in HTTP_Methods]: RoutherHandler<any>
@@ -37,21 +38,24 @@ type Routerhandles<S> = {
 
 class Router<S = {}> {
   paths: string[] = []
-  constructor(public node: Routington, paths: string[]) {
+  constructor(public rootNode: Routington, paths: string[]) {
     this.paths = [...paths] // clone
   }
-  // use<SS extends S>(middleware: Middleware<SS>){
-  //   this.middleware.push(middleware)
-  //   return (this as unknown) as Router<SS>
-  // }
+  use<SS extends S>(middleware: Middleware<SS>): Router<SS> {
+    // find current node
+    const [node] = this.rootNode.define(this.paths.join('/'))
+    node.middleware = node.middleware || []
+    node.middleware.push(middleware)
+    return (this as unknown) as Router<SS>
+  }
   subRoute(prefix: string) {
     if (prefix.startsWith('/')) {
       prefix = prefix.slice(1)
     }
     const path = [...this.paths, prefix].join('/')
     debug('subRoute define', path)
-    const [node] = this.node.define(path)
-    const router = new Router<S>(this.node, [...this.paths, prefix])
+    const [node] = this.rootNode.define(path)
+    const router = new Router<S>(this.rootNode, [...this.paths, prefix])
     node[ROUTER] = router
     return router
   }
@@ -64,7 +68,7 @@ for (let method of Object.keys(http_methods)) {
         path = path.slice(1)
       }
       path = [...this.paths, path].join('/')
-      const [node] = this.node.define(path)
+      const [node] = this.rootNode.define(path)
       debug('define %s %o', path, node)
       if (node[method.toUpperCase() as HTTP_Methods]) {
         throw new Error('already defined')
@@ -76,6 +80,19 @@ for (let method of Object.keys(http_methods)) {
 
 type RoutherHandler<S> = (ctx: Context<S>) => void | Promise<void>
 type Middleware<S> = (ctx: Context<S>, next: () => Promise<void>) => void | Promise<void>
+
+function compose(middlewares: Middleware<any>[]) {
+  return async (ctx: Context<any>) => {
+    async function dispatch(i = 0) {
+      const fn = middlewares[i]
+      if (!fn || i >= middlewares.length) {
+        return
+      }
+      await fn(ctx, dispatch.bind(null, i + 1))
+    }
+    await dispatch()
+  }
+}
 
 @logMethod(debug)
 class Application<S = {}> extends EventEmitter {
@@ -89,20 +106,28 @@ class Application<S = {}> extends EventEmitter {
 
   async route(ctx: Context<S>): Promise<void> {
     const method = ctx.request.method as HTTP_Methods
-    ;(() => {
-      const path = ctx.path!.slice(1)
-      const match = this.rootRouter.node.match(path)
-      debug('match %s %s %o %o', method, path, match, this.rootRouter.node)
+    const path = ctx.path!.slice(1)
+    const match = this.rootRouter.rootNode.match(path)
+    debug('match %s %s %o %o', method, path, match, this.rootRouter.rootNode)
 
-      if (!match) {
-        return
-      }
+    if (!match) {
+      return
+    }
 
-      if (match.node[method]) {
-        match.node[method](ctx)
+    if (match.node[method]) {
+      ctx.params = match.param
+      // apply middlewares
+      let node: Routington | undefined = match.node
+      const middlewares: Middleware<any>[] = []
+      while (node && node !== this.rootRouter.rootNode) {
+        if (node.middleware) {
+          middlewares.unshift(...node.middleware)
+        }
+        node = node.parent
       }
-    })()
-    // 404
+      await compose(middlewares)(ctx)
+      await match.node[method](ctx)
+    }
   }
   /**
    *
@@ -131,19 +156,14 @@ class Application<S = {}> extends EventEmitter {
   }
   async handleRequest(ctx: Context<S>) {
     ctx.res.statusCode = 404
-    const dispatch = async (i: number) => {
-      debug('dispatch', i, this.middleware.length)
-      if (i >= this.middleware.length) {
-        return this.route(ctx)
-      }
-      await this.middleware[i](ctx, dispatch.bind(null, i + 1))
-    }
-
     const onerror = (err: Error | null) => ctx.onerror(err)
     onFinished(ctx.res, onerror)
 
-    return dispatch(0)
-      .then(() => this.respond(ctx))
+    return compose(this.middleware)(ctx)
+      .then(async () => {
+        await this.route(ctx)
+        this.respond(ctx)
+      })
       .catch(onerror)
   }
   respond(ctx: Context<S>) {

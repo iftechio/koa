@@ -165,6 +165,7 @@ type Delegate = Pick<
     | 'get'
     | 'is'
     | 'querystring'
+    | 'params'
     | 'idempotent'
     | 'socket'
     | 'search'
@@ -223,6 +224,7 @@ delegate(Context.prototype, 'request')
   .method('get')
   .method('is')
   .access('querystring')
+  .access('params')
   .access('idempotent')
   .access('socket')
   .access('search')

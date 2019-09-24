@@ -2,12 +2,18 @@
 import Application from './application'
 import { Context } from './context'
 
-const app = new Application /*<{}>*/().use((ctx: Context<{ use: { id: string } }>, next) => {
+const app = new Application /*<{}>*/().use((ctx: Context<{ user: { id: string } }>, next) => {
   return next()
-}) /*<{user:{}}>*/
+}) /*<{user:{id: string}}>*/
 
 const router1 = app.createRouter('/route1')
-router1.get('/abc', (ctx: any) => {
-  ctx.body = '/route1/abc'
-})
+router1
+  // extend context again
+  .use((ctx: Context<{ user: { id: string; name: string } }>, next) => {
+    ctx.state.user.name = 'foo'
+    console.log(ctx)
+  })
+  .get('/abc', ctx => {
+    ctx.body = `hello, ${ctx.state.user.name}!`
+  })
 app.listen(3000)

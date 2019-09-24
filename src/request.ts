@@ -26,6 +26,7 @@ class Request {
   [IP]: string
   response: any
   ctx?: Context
+  params?: { [key: string]: string }
 
   constructor(
     public app: Application,
@@ -34,6 +35,7 @@ class Request {
   ) {
     this.originalUrl = req.url!
   }
+
   /**
    * Return request header.
    *
