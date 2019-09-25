@@ -25,11 +25,11 @@ class Request {
   _accept: any;
   [IP]: string
   response: any
-  ctx?: Context
+  ctx?: Context<any>
   params?: { [key: string]: string }
 
   constructor(
-    public app: Application,
+    public app: Application<any>,
     public req: http.IncomingMessage,
     public res: http.ServerResponse,
   ) {

@@ -23,7 +23,7 @@ const http_methods = strEnum(['get', 'post', 'put', 'patch', 'delete'])
 // augment Routington fields
 declare module 'routington' {
   export default interface Routington extends Handlers {
-    [ROUTER]: Router
+    [ROUTER]: Router<any>
     middleware?: Middleware<any>[]
   }
   type Handlers = {
@@ -31,22 +31,22 @@ declare module 'routington' {
   }
 }
 
-interface Router<S = {}> extends Routerhandles<S> {}
+interface Router<S extends {} = {}> extends Routerhandles<S> {}
 type Routerhandles<S> = {
   [key in keyof typeof http_methods]: (path: string, handler: RoutherHandler<S>) => void
 }
 
-class Router<S = {}> {
+class Router<S extends {} = {}> {
   paths: string[] = []
   constructor(public rootNode: Routington, paths: string[]) {
     this.paths = [...paths] // clone
   }
-  use<SS extends S>(middleware: Middleware<SS>): Router<SS> {
+  use<NS extends {} = S>(middleware: Middleware<NS>) {
     // find current node
     const [node] = this.rootNode.define(this.paths.join('/'))
     node.middleware = node.middleware || []
     node.middleware.push(middleware)
-    return (this as unknown) as Router<SS>
+    return (this as unknown) as Router<NS extends S ? NS : (S & NS)>
   }
   subRoute(prefix: string) {
     if (prefix.startsWith('/')) {
@@ -78,8 +78,11 @@ for (let method of Object.keys(http_methods)) {
   })
 }
 
-type RoutherHandler<S> = (ctx: Context<S>) => void | Promise<void>
-type Middleware<S> = (ctx: Context<S>, next: () => Promise<void>) => void | Promise<void>
+type RoutherHandler<S extends {}> = (ctx: Context<S>) => void | Promise<void>
+type Middleware<S extends {}> = (
+  ctx: Context<S>,
+  next: () => Promise<void>,
+) => void | Promise<void>
 
 function compose(middlewares: Middleware<any>[]) {
   return async (ctx: Context<any>) => {
@@ -95,7 +98,7 @@ function compose(middlewares: Middleware<any>[]) {
 }
 
 @logMethod(debug)
-class Application<S = {}> extends EventEmitter {
+class Application<S extends {} = {}> extends EventEmitter {
   rootRouter: Router<S>
   proxy: any
   subdomainOffset: any
@@ -224,10 +227,10 @@ class Application<S = {}> extends EventEmitter {
     return router
   }
 
-  use<SS extends S>(middleware: Middleware<SS>): Application<SS> {
+  use<NS extends {} = S>(middleware: Middleware<NS>) {
     if (typeof middleware !== 'function') throw new TypeError('middleware must be a function!')
     this.middleware.push(middleware)
-    return (this as unknown) as Application<SS>
+    return (this as unknown) as Application<NS extends S ? NS : (S & NS)>
   }
   createContext(req: http.IncomingMessage, res: http.ServerResponse): Context<S> {
     const request = new Request(this, req, res)

@@ -20,7 +20,7 @@ export class Context<S = {}> {
   state: S = {} as any
   respond?: boolean
 
-  constructor(public app: Application, public request: Request, public response: Response) {
+  constructor(public app: Application<S>, public request: Request, public response: Response) {
     this.req = request.req
     this.res = response.res
     this.originalUrl = request.originalUrl

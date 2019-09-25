@@ -27,13 +27,13 @@ import { isJSON } from './util/utils'
  */
 
 export default class Response {
-  ctx?: Context
+  ctx?: Context<any>
   _explicitStatus: any
   _body: any
   request?: Request
 
   constructor(
-    public app: Application,
+    public app: Application<any>,
     public req: http.IncomingMessage,
     public res: http.ServerResponse,
   ) {}
