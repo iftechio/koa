@@ -533,7 +533,7 @@ export default class Response {
     if (!this.res) return
     return { ...this.toJSON(), body: this.body }
   }
-  
+
   [util.inspect.custom] = this.inspect
   /**
    * Return JSON representation.

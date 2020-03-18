@@ -5,6 +5,7 @@
     "experimentalDecorators": true,
     "baseUrl": ".",
     "checkJs": true,
+    "declaration": true,
     "lib": ["esnext"],
     "module": "commonjs",
     "noImplicitReturns": true,

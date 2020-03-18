@@ -1,6 +1,6 @@
 {
-  "name": "koa-ts",
-  "version": "1.0.0",
+  "name": "@ruguoapp/koa-ts",
+  "version": "1.0.0-alpha.3",
   "description": "",
   "main": "dist/application.js",
   "scripts": {
@@ -16,6 +16,7 @@
   "dependencies": {
     "accepts": "^1.3.7",
     "cache-content-type": "^1.0.1",
+    "co-body": "^6.0.0",
     "content-disposition": "^0.5.3",
     "content-type": "^1.0.4",
     "cookies": "^0.7.3",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@types/accepts": "^1.3.5",
+    "@types/co-body": "0.0.3",
     "@types/content-disposition": "^0.5.2",
     "@types/content-type": "^1.1.3",
     "@types/cookies": "^0.7.3",
@@ -53,6 +55,9 @@
     "egg-bin": "^4.13.0",
     "mm": "^2.5.0",
     "supertest": "^4.0.2"
+  },
+  "publishConfig": {
+    "registry": "https://npmjs.iftech.dev"
   },
   "engines": {
     "node": ">= 8.0.0"

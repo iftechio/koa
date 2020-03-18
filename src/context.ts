@@ -12,15 +12,16 @@ import Application from './application'
 
 const COOKIES = Symbol()
 
-export class Context<S = {}> {
+export class Context<S = {}, R extends Request = Request> {
   req: IncomingMessage
   res: ServerResponse;
   [COOKIES]: Cookies
   originalUrl: string
   state: S = {} as any
   respond?: boolean
+  disableBodyParser?: boolean
 
-  constructor(public app: Application<S>, public request: Request, public response: Response) {
+  constructor(public app: Application<S>, public request: R, public response: Response) {
     this.req = request.req
     this.res = response.res
     this.originalUrl = request.originalUrl
@@ -46,13 +47,13 @@ export class Context<S = {}> {
   assert = httpAssert
   onerror(
     err:
-      | Error & {
+      | (Error & {
           headerSent?: boolean
           headers?: { [key: string]: string }
           status?: number
           code?: string
           expose?: boolean
-        }
+        })
       | null,
   ) {
     // don't do anything if there is no error.

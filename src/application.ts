@@ -12,6 +12,7 @@ import statuses from 'statuses'
 import { isJSON, strEnum } from './util/utils'
 import util from 'util'
 import onFinished from 'on-finished'
+import { Middleware } from './middleware'
 
 const debug = Debug('koa:application')
 
@@ -24,29 +25,29 @@ const http_methods = strEnum(['get', 'post', 'put', 'patch', 'delete'])
 declare module 'routington' {
   export default interface Routington extends Handlers {
     [ROUTER]: Router<any>
-    middleware?: Middleware<any>[]
+    middleware?: Middleware<any, any>[]
   }
   type Handlers = {
-    [key in HTTP_Methods]: RoutherHandler<any>
+    [key in HTTP_Methods]: RoutherHandler<any, any>
   }
 }
 
-interface Router<S extends {} = {}> extends Routerhandles<S> {}
-type Routerhandles<S> = {
-  [key in keyof typeof http_methods]: (path: string, handler: RoutherHandler<S>) => void
+interface Router<S extends {} = {}, R extends Request = Request> extends Routerhandles<S, R> {}
+type Routerhandles<S, R extends Request = Request> = {
+  [key in keyof typeof http_methods]: (path: string, handler: RoutherHandler<S, R>) => void
 }
 
-class Router<S extends {} = {}> {
+class Router<S extends {} = {}, R extends Request = Request> {
   paths: string[] = []
   constructor(public rootNode: Routington, paths: string[]) {
     this.paths = [...paths] // clone
   }
-  use<NS extends {} = S>(middleware: Middleware<NS>) {
+  use<NS extends {} = S, NR extends Request = R>(middleware: Middleware<NS, NR>) {
     // find current node
     const [node] = this.rootNode.define(this.paths.join('/'))
     node.middleware = node.middleware || []
     node.middleware.push(middleware)
-    return (this as unknown) as Router<NS extends S ? NS : (S & NS)>
+    return (this as unknown) as Router<NS extends S ? NS : S & NS, NR extends R ? NR : R & NR>
   }
   subRoute(prefix: string) {
     if (prefix.startsWith('/')) {
@@ -55,7 +56,7 @@ class Router<S extends {} = {}> {
     const path = [...this.paths, prefix].join('/')
     debug('subRoute define', path)
     const [node] = this.rootNode.define(path)
-    const router = new Router<S>(this.rootNode, [...this.paths, prefix])
+    const router = new Router<S, R>(this.rootNode, [...this.paths, prefix])
     node[ROUTER] = router
     return router
   }
@@ -63,7 +64,11 @@ class Router<S extends {} = {}> {
 
 for (let method of Object.keys(http_methods)) {
   Object.defineProperty(Router.prototype, method, {
-    value: function<S>(this: Router, path: string, handler: RoutherHandler<S>) {
+    value: function<S, R extends Request>(
+      this: Router,
+      path: string,
+      handler: RoutherHandler<S, R>,
+    ) {
       if (path.startsWith('/')) {
         path = path.slice(1)
       }
@@ -78,13 +83,11 @@ for (let method of Object.keys(http_methods)) {
   })
 }
 
-type RoutherHandler<S extends {}> = (ctx: Context<S>) => void | Promise<void>
-type Middleware<S extends {}> = (
-  ctx: Context<S>,
-  next: () => Promise<void>,
+type RoutherHandler<S extends {}, R extends Request = Request> = (
+  ctx: Context<S, R>,
 ) => void | Promise<void>
 
-function compose(middlewares: Middleware<any>[]) {
+function compose(middlewares: Middleware<any, any>[]) {
   return async (ctx: Context<any>) => {
     async function dispatch(i = 0) {
       const fn = middlewares[i]
@@ -98,12 +101,12 @@ function compose(middlewares: Middleware<any>[]) {
 }
 
 @logMethod(debug)
-class Application<S extends {} = {}> extends EventEmitter {
-  rootRouter: Router<S>
+class Application<S extends {} = {}, R extends Request = Request> extends EventEmitter {
+  rootRouter: Router<S, R>
   proxy: any
   subdomainOffset: any
   keys: string[] | Keygrip | undefined
-  middleware: Middleware<any>[] = []
+  middleware: Middleware<any, any>[] = []
   silent?: boolean
   env: string
 
@@ -121,7 +124,7 @@ class Application<S extends {} = {}> extends EventEmitter {
       ctx.params = match.param
       // apply middlewares
       let node: Routington | undefined = match.node
-      const middlewares: Middleware<any>[] = []
+      const middlewares: Middleware<any, any>[] = []
       while (node && node !== this.rootRouter.rootNode) {
         if (node.middleware) {
           middlewares.unshift(...node.middleware)
@@ -227,11 +230,12 @@ class Application<S extends {} = {}> extends EventEmitter {
     return router
   }
 
-  use<NS extends {} = S>(middleware: Middleware<NS>) {
+  use<NS extends {} = S, NR extends Request = R>(middleware: Middleware<NS, NR>) {
     if (typeof middleware !== 'function') throw new TypeError('middleware must be a function!')
     this.middleware.push(middleware)
-    return (this as unknown) as Application<NS extends S ? NS : (S & NS)>
+    return (this as unknown) as Application<NS extends S ? NS : S & NS, NR extends R ? NR : R & NR>
   }
+
   createContext(req: http.IncomingMessage, res: http.ServerResponse): Context<S> {
     const request = new Request(this, req, res)
     const response = new Response(this, req, res)
