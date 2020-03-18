@@ -1,3 +1,2 @@
-import Application from './application'
+export { Application } from './application'
 export * from './middlewares/body-parser'
-export const App = Application

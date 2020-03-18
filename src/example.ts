@@ -1,5 +1,5 @@
 // app.ts
-import Application from './application'
+import { Application } from './application'
 import { Context } from './context'
 import { BodyParser } from './middlewares/body-parser'
 

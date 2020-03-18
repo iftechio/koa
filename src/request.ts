@@ -10,7 +10,7 @@ import fresh from 'fresh'
 import http from 'http'
 import util from 'util'
 
-import Application from './application'
+import { Application } from './application'
 import { Context } from './context'
 import { logMethod } from './util/debug'
 

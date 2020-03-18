@@ -8,7 +8,7 @@ import httpAssert from 'http-assert'
 
 import Request from './request'
 import Response from './response'
-import Application from './application'
+import { Application } from './application'
 
 const COOKIES = Symbol()
 

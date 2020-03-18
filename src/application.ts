@@ -101,7 +101,7 @@ function compose(middlewares: Middleware<any, any>[]) {
 }
 
 @logMethod(debug)
-class Application<S extends {} = {}, R extends Request = Request> extends EventEmitter {
+export class Application<S extends {} = {}, R extends Request = Request> extends EventEmitter {
   rootRouter: Router<S, R>
   proxy: any
   subdomainOffset: any
@@ -291,5 +291,3 @@ class Application<S extends {} = {}, R extends Request = Request> extends EventE
     return address ? server.listen(address) : server.listen()
   }
 }
-
-export = Application
